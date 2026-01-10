@@ -19,13 +19,11 @@ namespace CanonicalLR1Parser
         }
 
         /// <summary>
-        /// Parses the input string and prints step-by-step execution
+        /// Parses the input and returns parsing steps for UI display
         /// </summary>
-        public bool Parse(List<string> inputTokens)
+        public List<ParseStep> ParseWithSteps(List<string> inputTokens)
         {
-            Console.WriteLine("=== PARSING EXECUTION ===");
-            Console.WriteLine($"Input: {string.Join(" ", inputTokens)}");
-            Console.WriteLine();
+            var steps = new List<ParseStep>();
 
             // Initialize stacks
             var stateStack = new Stack<int>();
@@ -38,31 +36,28 @@ namespace CanonicalLR1Parser
             input.Add("$");
             
             int inputIndex = 0;
-            int step = 0;
-
-            Console.WriteLine($"{"Step",-6} {"State Stack",-25} {"Symbol Stack",-30} {"Input",-20} {"Action",-20}");
-            Console.WriteLine(new string('-', 110));
 
             while (true)
             {
-                step++;
                 int currentState = stateStack.Peek();
                 string currentToken = input[inputIndex];
 
                 // Get action
                 var action = table.GetAction(currentState, currentToken);
 
-                // Print current configuration
-                string stateStackStr = string.Join(" ", stateStack.Reverse());
-                string symbolStackStr = string.Join(" ", symbolStack.Reverse());
-                string inputStr = string.Join(" ", input.Skip(inputIndex));
-                
-                Console.Write($"{step,-6} {stateStackStr,-25} {symbolStackStr,-30} {inputStr,-20} ");
+                // Record step
+                var step = new ParseStep
+                {
+                    StateStack = new Stack<int>(stateStack.Reverse()),
+                    SymbolStack = new Stack<string>(symbolStack.Reverse()),
+                    RemainingInput = input.Skip(inputIndex).ToList(),
+                    Action = action,
+                    ActionDescription = GetActionDescription(action, currentToken)
+                };
+                steps.Add(step);
 
                 if (action.Type == ActionType.Shift)
                 {
-                    Console.WriteLine($"Shift {action.Value}");
-                    
                     // Shift: push token and state
                     symbolStack.Push(currentToken);
                     stateStack.Push(action.Value);
@@ -71,7 +66,6 @@ namespace CanonicalLR1Parser
                 else if (action.Type == ActionType.Reduce)
                 {
                     Production production = grammar.Productions[action.Value];
-                    Console.WriteLine($"Reduce by {action.Value}: {production}");
                     
                     // Pop symbols and states
                     int popCount = production.RightHandSide.Count;
@@ -92,27 +86,35 @@ namespace CanonicalLR1Parser
                     
                     if (gotoState == -1)
                     {
-                        Console.WriteLine($"\nError: No GOTO entry for state {topState} and symbol {production.LeftHandSide}");
-                        return false;
+                        step.IsError = true;
+                        return steps;
                     }
                     
                     stateStack.Push(gotoState);
                 }
                 else if (action.Type == ActionType.Accept)
                 {
-                    Console.WriteLine("Accept");
-                    Console.WriteLine();
-                    Console.WriteLine("✓ PARSING SUCCESSFUL - INPUT ACCEPTED!");
-                    return true;
+                    step.IsAccepted = true;
+                    return steps;
                 }
                 else
                 {
-                    Console.WriteLine("Error");
-                    Console.WriteLine();
-                    Console.WriteLine("✗ PARSING FAILED - SYNTAX ERROR!");
-                    return false;
+                    step.IsError = true;
+                    return steps;
                 }
             }
+        }
+
+        private string GetActionDescription(ParserAction action, string currentToken)
+        {
+            return action.Type switch
+            {
+                ActionType.Shift => $"Shift {action.Value}",
+                ActionType.Reduce => $"Reduce by {action.Value}: {grammar.Productions[action.Value]}",
+                ActionType.Accept => "Accept",
+                ActionType.Error => $"Error on '{currentToken}'",
+                _ => "Unknown"
+            };
         }
 
         /// <summary>
@@ -149,5 +151,19 @@ namespace CanonicalLR1Parser
 
             return tokens;
         }
+    }
+
+    /// <summary>
+    /// Represents a single parsing step
+    /// </summary>
+    public class ParseStep
+    {
+        public Stack<int> StateStack { get; set; } = new();
+        public Stack<string> SymbolStack { get; set; } = new();
+        public List<string> RemainingInput { get; set; } = new();
+        public ParserAction Action { get; set; } = new(ActionType.Error);
+        public string ActionDescription { get; set; } = "";
+        public bool IsAccepted { get; set; } = false;
+        public bool IsError { get; set; } = false;
     }
 }
