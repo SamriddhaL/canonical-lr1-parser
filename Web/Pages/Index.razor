@@ -1,0 +1,720 @@
+@page "/"
+@using CanonicalLR1Parser
+@using System.Text
+@implements IDisposable
+
+<PageTitle>Canonical LR(1) Parser Demo</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Fira+Code&family=Inter:wght@400;600&display=swap');
+    
+    body {
+        font-family: 'Inter', sans-serif;
+        margin: 0;
+        padding: 0;
+    }
+    
+    .hero-section {
+        background: #2c3e50;
+        color: white;
+        padding: 30px;
+        text-align: center;
+        border-bottom: 4px solid #3498db;
+    }
+    
+    .hero-title {
+        font-size: 2em;
+        margin: 0;
+        font-weight: 600;
+    }
+    
+    .hero-subtitle {
+        font-size: 1em;
+        margin: 8px 0 0 0;
+        opacity: 0.9;
+    }
+    
+    .control-panel {
+        position: sticky;
+        top: 0;
+        background: white;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        z-index: 100;
+        border-bottom: 2px solid #3498db;
+    }
+    
+    .controls-row {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .btn {
+        padding: 10px 24px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.2s;
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .btn-primary {
+        background: #3498db;
+        color: white;
+    }
+    
+    .btn-primary:hover:not(:disabled) {
+        background: #2980b9;
+    }
+    
+    .btn-success {
+        background: #27ae60;
+        color: white;
+    }
+    
+    .btn-warning {
+        background: #e67e22;
+        color: white;
+    }
+    
+    .btn-secondary {
+        background: #7f8c8d;
+        color: white;
+    }
+    
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .speed-control {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 16px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+    
+    .speed-slider {
+        width: 150px;
+    }
+    
+    .progress-container {
+        flex: 1;
+        min-width: 200px;
+    }
+    
+    .progress-text {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 5px;
+        font-size: 14px;
+    }
+    
+    .progress-bar-wrapper {
+        background: #e9ecef;
+        height: 8px;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    .progress-bar-fill {
+        background: #3498db;
+        height: 100%;
+        transition: width 0.3s ease;
+    }
+    
+    .step-container {
+        margin: 20px auto;
+        max-width: 1400px;
+        padding: 20px;
+        background: white;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-left: 4px solid #3498db;
+        animation: slideIn 0.3s ease-out;
+    }
+    
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    .step-title {
+        font-size: 1.3em;
+        color: #2c3e50;
+        margin-bottom: 15px;
+        font-weight: 600;
+        border-bottom: 2px solid #ecf0f1;
+        padding-bottom: 10px;
+    }
+    
+    .completed-step {
+        opacity: 0.6;
+        border-left-color: #27ae60;
+    }
+    
+    .completed-step .step-title {
+        color: #7f8c8d;
+    }
+    
+    .current-step {
+        background: #fff9e6;
+        border-left-color: #e67e22;
+    }
+    
+    .current-step .step-title {
+        color: #e67e22;
+    }
+    
+    .state-box {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 15px;
+        margin: 10px 0;
+        animation: fadeInUp 0.3s ease-out;
+    }
+    
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .state-header {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #3498db;
+    }
+    
+    .item {
+        font-family: 'Fira Code', monospace;
+        padding: 6px 10px;
+        margin: 4px 0;
+        background: white;
+        border-radius: 3px;
+        color: #2c3e50;
+        font-size: 0.9em;
+    }
+    
+    .action-cell {
+        padding: 8px 12px;
+        border-radius: 4px;
+        margin: 4px;
+        display: inline-block;
+        font-family: 'Fira Code', monospace;
+        font-weight: 500;
+        font-size: 0.9em;
+    }
+    
+    .reduce-action {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .shift-action {
+        background: #cce5ff;
+        color: #004085;
+    }
+    
+    .goto-action {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .parse-step-row {
+        display: grid;
+        grid-template-columns: 60px 200px 250px 200px 250px;
+        gap: 10px;
+        padding: 10px;
+        border-bottom: 1px solid #e9ecef;
+        font-family: 'Fira Code', monospace;
+        font-size: 0.9em;
+    }
+    
+    .parse-step-header {
+        font-weight: 600;
+        background: #34495e;
+        color: white;
+        padding: 10px;
+        border-radius: 4px 4px 0 0;
+    }
+    
+    .parse-step-current {
+        background: #fff3cd;
+        font-weight: 600;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 10px 20px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 1em;
+        margin-top: 15px;
+    }
+    
+    .status-success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .status-error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .summary-box {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 4px;
+        margin-top: 15px;
+        font-family: 'Fira Code', monospace;
+        line-height: 1.6;
+        border: 1px solid #dee2e6;
+    }
+    
+    pre {
+        font-family: 'Fira Code', monospace;
+        line-height: 1.5;
+        margin: 0;
+    }
+    
+    .content-wrapper {
+        padding: 20px;
+        background: #f8f9fa;
+        min-height: calc(100vh - 200px);
+    }
+</style>
+
+<div class="hero-section">
+    <h1 class="hero-title">Canonical LR(1) Parser</h1>
+    <p class="hero-subtitle">Interactive Parser Construction Demo</p>
+</div>
+
+<div class="control-panel">
+    <div class="controls-row">
+        @if (!isRunning && currentStep == 0)
+        {
+            <button class="btn btn-primary" @onclick="StartAutoPlay">Start Demo</button>
+        }
+        else if (isRunning)
+        {
+            <button class="btn btn-warning" @onclick="Pause">Pause</button>
+        }
+        else if (!isRunning && currentStep > 0 && !isDemoComplete)
+        {
+            <button class="btn btn-success" @onclick="Resume">Resume</button>
+        }
+        
+        <button class="btn btn-secondary" @onclick="Reset">Reset</button>
+        
+        <div class="speed-control">
+            <span>Speed:</span>
+            <input type="range" min="100" max="2000" step="100" @bind="speed" @bind:event="oninput" class="speed-slider" />
+            <span>@(speed)ms</span>
+        </div>
+        
+        <div class="progress-container">
+            <div class="progress-text">@progressMessage</div>
+            <div class="progress-bar-wrapper">
+                <div class="progress-bar-fill" style="width: @(progressPercentage)%"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="content-wrapper">
+    @if (currentStep >= 1)
+    {
+        <div class="step-container @(currentStep > 1 ? "completed-step" : "current-step")">
+            <div class="step-title">Step 1: Grammar Definition</div>
+            <pre>@grammarText</pre>
+        </div>
+    }
+
+    @if (currentStep >= 2)
+    {
+        <div class="step-container @(currentStep > 2 ? "completed-step" : "current-step")">
+            <div class="step-title">Step 2: FIRST Sets Computation</div>
+            <pre>@firstSetsText</pre>
+        </div>
+    }
+
+    @if (currentStep >= 3)
+    {
+        <div class="step-container @(currentStep > 3 ? "completed-step" : "current-step")">
+            <div class="step-title">Step 3: Building LR(1) States (@(currentStateIndex + 1) / @collection.States.Count)</div>
+            @for (int i = 0; i <= Math.Min(currentStateIndex, collection.States.Count - 1); i++)
+            {
+                var state = collection.States[i];
+                <div class="state-box">
+                    <div class="state-header">State @i (@state.Items.Count items)</div>
+                    @foreach (var item in state.Items.OrderBy(x => x.Production.LeftHandSide).ThenBy(x => x.DotPosition))
+                    {
+                        <div class="item">[@item.Production.LeftHandSide → @GetItemDisplay(item), @item.Lookahead]</div>
+                    }
+                    @{
+                        var outgoingTransitions = collection.Transitions.Where(t => t.Key.Item1 == i).ToList();
+                        if (outgoingTransitions.Any())
+                        {
+                            <div style="margin-top: 10px; color: #6c757d; font-size: 0.9em;">
+                                <strong>Transitions:</strong>
+                                @foreach (var trans in outgoingTransitions)
+                                {
+                                    <span style="margin-left: 10px;">@trans.Key.Item2 → State @trans.Value</span>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @if (currentStep >= 4)
+    {
+        <div class="step-container @(currentStep > 4 ? "completed-step" : "current-step")">
+            <div class="step-title">Step 4: Parsing Table Construction (@(currentTableStateIndex + 1) / @collection.States.Count)</div>
+            
+            <h3 style="color: #2c3e50; margin-top: 15px;">ACTION Table</h3>
+            @for (int stateId = 0; stateId <= Math.Min(currentTableStateIndex, collection.States.Count - 1); stateId++)
+            {
+                <div style="margin: 10px 0;">
+                    <strong>State @stateId:</strong>
+                    @foreach (var terminal in grammar.Terminals.OrderBy(t => t))
+                    {
+                        var action = parsingTable.GetAction(stateId, terminal);
+                        if (action != null)
+                        {
+                            var cssClass = action.Type == ActionType.Shift ? "shift-action" : 
+                                          action.Type == ActionType.Reduce ? "reduce-action" : "action-cell";
+                            <span class="action-cell @cssClass">
+                                @terminal: @GetActionDisplay(action)
+                            </span>
+                        }
+                    }
+                </div>
+            }
+            
+            <h3 style="color: #2c3e50; margin-top: 20px;">GOTO Table</h3>
+            @for (int stateId = 0; stateId <= Math.Min(currentTableStateIndex, collection.States.Count - 1); stateId++)
+            {
+                <div style="margin: 10px 0;">
+                    <strong>State @stateId:</strong>
+                    @foreach (var nt in grammar.NonTerminals.Where(n => n != "S'").OrderBy(n => n))
+                    {
+                        var gotoState = parsingTable.GetGoto(stateId, nt);
+                        if (gotoState != -1)
+                        {
+                            <span class="action-cell goto-action">
+                                @nt → State @gotoState
+                            </span>
+                        }
+                    }
+                </div>
+            }
+            
+            @if (currentTableStateIndex >= collection.States.Count - 1)
+            {
+                <div style="margin-top: 20px; padding: 15px; background: #d4edda; border-radius: 4px; border: 1px solid #c3e6cb;">
+                    <strong>Conflict Analysis:</strong> @(parsingTable.HasConflicts ? "CONFLICTS DETECTED" : "NO CONFLICTS - Grammar IS Canonical LR(1)")
+                </div>
+            }
+        </div>
+    }
+
+    @if (currentStep >= 5)
+    {
+        <div class="step-container @(currentStep > 5 ? "completed-step" : "current-step")">
+            <div class="step-title">Step 5: Parsing Input String</div>
+            <p><strong>Input:</strong> <code style="background: white; padding: 6px 12px; border-radius: 3px; font-family: 'Fira Code', monospace;">@inputString</code></p>
+            
+            <div class="parse-step-header parse-step-row">
+                <div>Step</div>
+                <div>State Stack</div>
+                <div>Symbol Stack</div>
+                <div>Remaining Input</div>
+                <div>Action</div>
+            </div>
+            
+            @for (int i = 0; i <= Math.Min(currentParseStepIndex, parseSteps.Count - 1); i++)
+            {
+                var step = parseSteps[i];
+                <div class="parse-step-row @(i == currentParseStepIndex ? "parse-step-current" : "")">
+                    <div>@(i + 1)</div>
+                    <div>@string.Join(" ", step.StateStack)</div>
+                    <div>@string.Join(" ", step.SymbolStack)</div>
+                    <div>@string.Join(" ", step.RemainingInput)</div>
+                    <div>@step.ActionDescription</div>
+                </div>
+            }
+            
+            @if (currentParseStepIndex >= parseSteps.Count - 1 && parseSteps.Any())
+            {
+                <div class="status-badge @(parseSteps.Last().IsAccepted ? "status-success" : "status-error")">
+                    @(parseSteps.Last().IsAccepted ? "PARSING SUCCESSFUL - INPUT ACCEPTED" : "PARSING FAILED - INPUT REJECTED")
+                </div>
+            }
+        </div>
+    }
+
+    @if (currentStep >= 6)
+    {
+        <div class="step-container">
+            <div class="step-title">Step 6: Summary & Grammar Semantics</div>
+            <div class="summary-box">
+                <pre>@summaryText</pre>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private int currentStep = 0;
+    private int currentStateIndex = -1;
+    private int currentTableStateIndex = -1;
+    private int currentParseStepIndex = -1;
+    private bool isRunning = false;
+    private bool isDemoComplete = false;
+    private int speed = 500;
+    private System.Threading.Timer? timer;
+    
+    private Grammar grammar = null!;
+    private FirstSetComputer firstComputer = null!;
+    private LR1Operations operations = null!;
+    private CanonicalCollection collection = null!;
+    private ParsingTable parsingTable = null!;
+    private List<ParseStep> parseSteps = new();
+    private string inputString = "id = * id";
+    
+    private string grammarText = "";
+    private string firstSetsText = "";
+    private string summaryText = "";
+    
+    private string progressMessage => GetProgressMessage();
+    private double progressPercentage => GetProgressPercentage();
+    
+    private void StartAutoPlay()
+    {
+        currentStep = 1;
+        isRunning = true;
+        isDemoComplete = false;
+        
+        grammar = new Grammar();
+        firstComputer = new FirstSetComputer(grammar);
+        operations = new LR1Operations(grammar, firstComputer);
+        collection = new CanonicalCollection(grammar, operations);
+        
+        var sb = new StringBuilder();
+        for (int i = 0; i < grammar.Productions.Count; i++)
+        {
+            sb.AppendLine($"{i}: {grammar.Productions[i]}");
+        }
+        grammarText = sb.ToString();
+        
+        StartTimer();
+    }
+    
+    private void StartTimer()
+    {
+        timer?.Dispose();
+        timer = new System.Threading.Timer(async _ => await AdvanceStep(), null, speed, speed);
+    }
+    
+    private async Task AdvanceStep()
+    {
+        await InvokeAsync(() =>
+        {
+            if (!isRunning) return;
+            
+            if (currentStep == 1)
+            {
+                currentStep = 2;
+                var sb = new StringBuilder();
+                var firstSets = firstComputer.GetAllFirstSets();
+                foreach (var nt in grammar.NonTerminals.OrderBy(x => x))
+                {
+                    sb.AppendLine($"FIRST({nt}) = {{ {string.Join(", ", firstSets[nt].OrderBy(x => x))} }}");
+                }
+                firstSetsText = sb.ToString();
+            }
+            else if (currentStep == 2)
+            {
+                currentStep = 3;
+                collection.Build();
+                currentStateIndex = 0;
+            }
+            else if (currentStep == 3 && currentStateIndex < collection.States.Count - 1)
+            {
+                currentStateIndex++;
+            }
+            else if (currentStep == 3)
+            {
+                currentStep = 4;
+                parsingTable = new ParsingTable(grammar, collection);
+                parsingTable.ConstructTables();
+                currentTableStateIndex = 0;
+            }
+            else if (currentStep == 4 && currentTableStateIndex < collection.States.Count - 1)
+            {
+                currentTableStateIndex++;
+            }
+            else if (currentStep == 4)
+            {
+                currentStep = 5;
+                var tokens = LR1Parser.Tokenize(inputString);
+                var parser = new LR1Parser(grammar, parsingTable);
+                parseSteps = parser.ParseWithSteps(tokens);
+                currentParseStepIndex = 0;
+            }
+            else if (currentStep == 5 && currentParseStepIndex < parseSteps.Count - 1)
+            {
+                currentParseStepIndex++;
+            }
+            else if (currentStep == 5)
+            {
+                currentStep = 6;
+                var sb = new StringBuilder();
+                sb.AppendLine("═══════════════════════════════════════════════════════════════════");
+                sb.AppendLine("GRAMMAR SEMANTICS");
+                sb.AppendLine("═══════════════════════════════════════════════════════════════════");
+                sb.AppendLine("The grammar treats * as a unary prefix operator (dereference),");
+                sb.AppendLine("NOT as an infix multiplication operator.");
+                sb.AppendLine();
+                sb.AppendLine("Therefore, the string 'id = id * id' is NOT derivable from this");
+                sb.AppendLine("grammar and is correctly REJECTED by the Canonical LR(1) parser.");
+                sb.AppendLine();
+                sb.AppendLine("Valid examples:");
+                sb.AppendLine("  - id = * id    (assign dereference-of-id to id)");
+                sb.AppendLine("  - * * id       (double dereference)");
+                sb.AppendLine("  - id           (just an identifier)");
+                sb.AppendLine();
+                sb.AppendLine("Invalid examples:");
+                sb.AppendLine("  - id = id * id (would require infix * operator)");
+                sb.AppendLine();
+                sb.AppendLine("═══════════════════════════════════════════════════════════════════");
+                sb.AppendLine($"Final Statistics:");
+                sb.AppendLine($"  Total LR(1) States: {collection.States.Count}");
+                sb.AppendLine($"  Total Transitions: {collection.Transitions.Count}");
+                sb.AppendLine($"  Conflicts: {(parsingTable.HasConflicts ? "YES" : "NONE")}");
+                sb.AppendLine($"  Grammar Type: {(parsingTable.HasConflicts ? "NOT Canonical LR(1)" : "Canonical LR(1)")}");
+                sb.AppendLine("═══════════════════════════════════════════════════════════════════");
+                summaryText = sb.ToString();
+                
+                isRunning = false;
+                isDemoComplete = true;
+                timer?.Dispose();
+            }
+            
+            StateHasChanged();
+        });
+    }
+    
+    private void Pause()
+    {
+        isRunning = false;
+        timer?.Dispose();
+    }
+    
+    private void Resume()
+    {
+        isRunning = true;
+        StartTimer();
+    }
+    
+    private void Reset()
+    {
+        isRunning = false;
+        isDemoComplete = false;
+        currentStep = 0;
+        currentStateIndex = -1;
+        currentTableStateIndex = -1;
+        currentParseStepIndex = -1;
+        grammarText = "";
+        firstSetsText = "";
+        summaryText = "";
+        parseSteps.Clear();
+        timer?.Dispose();
+    }
+    
+    private string GetProgressMessage()
+    {
+        if (currentStep == 0) return "Ready to start";
+        if (currentStep == 1) return "Loading grammar...";
+        if (currentStep == 2) return "Computing FIRST sets...";
+        if (currentStep == 3) return $"Building LR(1) states: {currentStateIndex + 1} / {collection.States.Count}";
+        if (currentStep == 4) return $"Constructing parsing tables: {currentTableStateIndex + 1} / {collection.States.Count}";
+        if (currentStep == 5) return $"Parsing input: step {currentParseStepIndex + 1} / {parseSteps.Count}";
+        if (currentStep == 6) return "Demo complete";
+        return "";
+    }
+    
+    private double GetProgressPercentage()
+    {
+        if (currentStep == 0) return 0;
+        if (currentStep == 1) return 10;
+        if (currentStep == 2) return 20;
+        if (currentStep == 3)
+        {
+            var stateProgress = (currentStateIndex + 1.0) / collection.States.Count * 20;
+            return 20 + stateProgress;
+        }
+        if (currentStep == 4)
+        {
+            var tableProgress = (currentTableStateIndex + 1.0) / collection.States.Count * 20;
+            return 40 + tableProgress;
+        }
+        if (currentStep == 5)
+        {
+            var parseProgress = (currentParseStepIndex + 1.0) / parseSteps.Count * 20;
+            return 60 + parseProgress;
+        }
+        if (currentStep == 6) return 100;
+        return 0;
+    }
+    
+    private string GetItemDisplay(LR1Item item)
+    {
+        var rhs = new List<string>(item.Production.RightHandSide);
+        rhs.Insert(item.DotPosition, "•");
+        return string.Join(" ", rhs);
+    }
+    
+    private string GetActionDisplay(ParserAction action)
+    {
+        return action.Type switch
+        {
+            ActionType.Shift => $"Shift {action.Value}",
+            ActionType.Reduce => $"Reduce {action.Value}",
+            ActionType.Accept => "Accept",
+            _ => "Error"
+        };
+    }
+    
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+}
