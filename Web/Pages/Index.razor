@@ -343,6 +343,15 @@
             </div>
         </div>
     </div>
+    
+    <div style="margin-top: 15px; padding-top: 15px; border-top: 2px solid #ecf0f1;">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <span style="font-weight: 600; color: #495057;">Parse Custom Input:</span>
+            <input type="text" @bind="customInput" placeholder="Enter input string (e.g., id = * id)" 
+                   style="padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 4px; flex: 1; min-width: 250px;" />
+            <button class="btn btn-primary" @onclick="ParseCustomInput">Parse</button>
+        </div>
+    </div>
 </div>
 
 <div class="content-wrapper">
@@ -350,7 +359,7 @@
     {
         <div class="step-container @(currentStep > 1 ? "completed-step" : "current-step")">
             <div class="step-title">Step 1: Grammar Definition</div>
-            <pre>@grammarText</pre>
+            <pre>@(isCustomDemoMode ? customDemoGrammarText : grammarText)</pre>
         </div>
     }
 
@@ -358,7 +367,7 @@
     {
         <div class="step-container @(currentStep > 2 ? "completed-step" : "current-step")">
             <div class="step-title">Step 2: FIRST Sets Computation</div>
-            <pre>@firstSetsText</pre>
+            <pre>@(isCustomDemoMode ? customDemoFirstSetsText : firstSetsText)</pre>
         </div>
     }
 
@@ -399,6 +408,9 @@
             <div class="step-title">Step 4: Parsing Table Construction (@(currentTableStateIndex + 1) / @collection.States.Count)</div>
             
             <h3 style="color: #2c3e50; margin-top: 15px;">ACTION Table</h3>
+            <div style="margin-bottom: 10px; padding: 8px; background: #e8f4f8; border-left: 3px solid #3498db; font-size: 0.9em;">
+                <strong>Note:</strong> Empty cells (not shown) indicate syntax errors - the parser rejects that input.
+            </div>
             @for (int stateId = 0; stateId <= Math.Min(currentTableStateIndex, collection.States.Count - 1); stateId++)
             {
                 <div style="margin: 10px 0;">
@@ -448,8 +460,8 @@
     @if (currentStep >= 5)
     {
         <div class="step-container @(currentStep > 5 ? "completed-step" : "current-step")">
-            <div class="step-title">Step 5: Parsing Input String</div>
-            <p><strong>Input:</strong> <code style="background: white; padding: 6px 12px; border-radius: 3px; font-family: 'Fira Code', monospace;">@inputString</code></p>
+            <div class="step-title">Step 5: Parsing Input String - Step @(currentParseStepIndex + 1) / @(isCustomDemoMode ? customDemoParseSteps.Count : parseSteps.Count)</div>
+            <p><strong>Input:</strong> <code style="background: white; padding: 6px 12px; border-radius: 3px; font-family: 'Fira Code', monospace;">@(isCustomDemoMode ? customInput : inputString)</code></p>
             
             <div class="parse-step-header parse-step-row">
                 <div>Step</div>
@@ -459,22 +471,27 @@
                 <div>Action</div>
             </div>
             
-            @for (int i = 0; i <= Math.Min(currentParseStepIndex, parseSteps.Count - 1); i++)
-            {
-                var step = parseSteps[i];
-                <div class="parse-step-row @(i == currentParseStepIndex ? "parse-step-current" : "")">
-                    <div>@(i + 1)</div>
-                    <div>@string.Join(" ", step.StateStack)</div>
-                    <div>@string.Join(" ", step.SymbolStack)</div>
-                    <div>@string.Join(" ", step.RemainingInput)</div>
-                    <div>@step.ActionDescription</div>
-                </div>
+            @{
+                var currentParseList = isCustomDemoMode ? customDemoParseSteps : parseSteps;
+                for (int i = 0; i <= Math.Min(currentParseStepIndex, currentParseList.Count - 1); i++)
+                {
+                    var step = currentParseList[i];
+                    <div class="parse-step-row @(i == currentParseStepIndex ? "parse-step-current" : "")">
+                        <div>@(i + 1)</div>
+                        <div>@string.Join(" ", step.StateStack)</div>
+                        <div>@string.Join(" ", step.SymbolStack)</div>
+                        <div>@string.Join(" ", step.RemainingInput)</div>
+                        <div>@GetActionDisplay(step.Action)</div>
+                    </div>
+                }
             }
             
-            @if (currentParseStepIndex >= parseSteps.Count - 1 && parseSteps.Any())
+            @if (currentParseStepIndex >= (isCustomDemoMode ? customDemoParseSteps.Count - 1 : parseSteps.Count - 1) && (isCustomDemoMode ? customDemoParseSteps.Any() : parseSteps.Any()))
             {
-                <div class="status-badge @(parseSteps.Last().IsAccepted ? "status-success" : "status-error")">
-                    @(parseSteps.Last().IsAccepted ? "PARSING SUCCESSFUL - INPUT ACCEPTED" : "PARSING FAILED - INPUT REJECTED")
+                var lastStep = isCustomDemoMode ? customDemoParseSteps.Last() : parseSteps.Last();
+                var isAccepted = lastStep.Action.Type == ActionType.Accept;
+                <div class="status-badge @(isAccepted ? "status-success" : "status-error")">
+                    @(isAccepted ? "PARSING SUCCESSFUL - INPUT ACCEPTED" : "PARSING FAILED - INPUT REJECTED")
                 </div>
             }
         </div>
@@ -482,10 +499,33 @@
 
     @if (currentStep >= 6)
     {
-        <div class="step-container">
-            <div class="step-title">Step 6: Summary & Grammar Semantics</div>
+        <div class="step-container @(isCustomDemoMode ? (isDemoComplete ? "completed-step" : "current-step") : (currentStep > 6 ? "completed-step" : "current-step"))">
+            <div class="step-title">Step 6: @(isCustomDemoMode ? "Parsing Results" : "Summary & Grammar Semantics")</div>
             <div class="summary-box">
-                <pre>@summaryText</pre>
+                <pre>@(isCustomDemoMode ? customDemoSummaryText : summaryText)</pre>
+            </div>
+        </div>
+    }
+    
+    @if (isCustomDemoMode && currentStep >= 5 && customDemoParseSteps.Any())
+    {
+        <div class="step-container" style="border-left-color: #9b59b6;">
+            <div class="step-title" style="color: #9b59b6;">Complete Parsing Trace for: @customInput</div>
+            <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; overflow-x: auto;">
+                <pre style="margin: 0; font-family: 'Fira Code', monospace; font-size: 0.85em;">Step   State Stack               Symbol Stack                   Input                Action
+──────────────────────────────────────────────────────────────────────────────────────────────
+@{
+    int stepNum = 1;
+    foreach (var step in customDemoParseSteps)
+    {
+        var stateStackStr = string.Join(" ", step.StateStack);
+        var symbolStackStr = string.Join(" ", step.SymbolStack);
+        var inputStr = string.Join(" ", step.RemainingInput);
+        var actionStr = GetActionDisplay(step.Action);
+        @($"{stepNum,-6} {stateStackStr,-23} {symbolStackStr,-29} {inputStr,-21} {actionStr}\n");
+        stepNum++;
+    }
+}</pre>
             </div>
         </div>
     }
@@ -508,6 +548,14 @@
     private ParsingTable parsingTable = null!;
     private List<ParseStep> parseSteps = new();
     private string inputString = "id = * id";
+    private string customInput = "id = * id";
+    private string customParseOutput = "";
+    
+    private bool isCustomDemoMode = false;
+    private string customDemoGrammarText = "";
+    private string customDemoFirstSetsText = "";
+    private string customDemoSummaryText = "";
+    private List<ParseStep> customDemoParseSteps = new();
     
     private string grammarText = "";
     private string firstSetsText = "";
@@ -545,91 +593,98 @@
     
     private async Task AdvanceStep()
     {
-        await InvokeAsync(() =>
+        if (isCustomDemoMode)
         {
-            if (!isRunning) return;
-            
-            if (currentStep == 1)
+            await AdvanceCustomStep();
+        }
+        else
+        {
+            await InvokeAsync(() =>
             {
-                currentStep = 2;
-                var sb = new StringBuilder();
-                var firstSets = firstComputer.GetAllFirstSets();
-                foreach (var nt in grammar.NonTerminals.OrderBy(x => x))
-                {
-                    sb.AppendLine($"FIRST({nt}) = {{ {string.Join(", ", firstSets[nt].OrderBy(x => x))} }}");
-                }
-                firstSetsText = sb.ToString();
-            }
-            else if (currentStep == 2)
-            {
-                currentStep = 3;
-                collection.Build();
-                currentStateIndex = 0;
-            }
-            else if (currentStep == 3 && currentStateIndex < collection.States.Count - 1)
-            {
-                currentStateIndex++;
-            }
-            else if (currentStep == 3)
-            {
-                currentStep = 4;
-                parsingTable = new ParsingTable(grammar, collection);
-                parsingTable.ConstructTables();
-                currentTableStateIndex = 0;
-            }
-            else if (currentStep == 4 && currentTableStateIndex < collection.States.Count - 1)
-            {
-                currentTableStateIndex++;
-            }
-            else if (currentStep == 4)
-            {
-                currentStep = 5;
-                var tokens = LR1Parser.Tokenize(inputString);
-                var parser = new LR1Parser(grammar, parsingTable);
-                parseSteps = parser.ParseWithSteps(tokens);
-                currentParseStepIndex = 0;
-            }
-            else if (currentStep == 5 && currentParseStepIndex < parseSteps.Count - 1)
-            {
-                currentParseStepIndex++;
-            }
-            else if (currentStep == 5)
-            {
-                currentStep = 6;
-                var sb = new StringBuilder();
-                sb.AppendLine("═══════════════════════════════════════════════════════════════════");
-                sb.AppendLine("GRAMMAR SEMANTICS");
-                sb.AppendLine("═══════════════════════════════════════════════════════════════════");
-                sb.AppendLine("The grammar treats * as a unary prefix operator (dereference),");
-                sb.AppendLine("NOT as an infix multiplication operator.");
-                sb.AppendLine();
-                sb.AppendLine("Therefore, the string 'id = id * id' is NOT derivable from this");
-                sb.AppendLine("grammar and is correctly REJECTED by the Canonical LR(1) parser.");
-                sb.AppendLine();
-                sb.AppendLine("Valid examples:");
-                sb.AppendLine("  - id = * id    (assign dereference-of-id to id)");
-                sb.AppendLine("  - * * id       (double dereference)");
-                sb.AppendLine("  - id           (just an identifier)");
-                sb.AppendLine();
-                sb.AppendLine("Invalid examples:");
-                sb.AppendLine("  - id = id * id (would require infix * operator)");
-                sb.AppendLine();
-                sb.AppendLine("═══════════════════════════════════════════════════════════════════");
-                sb.AppendLine($"Final Statistics:");
-                sb.AppendLine($"  Total LR(1) States: {collection.States.Count}");
-                sb.AppendLine($"  Total Transitions: {collection.Transitions.Count}");
-                sb.AppendLine($"  Conflicts: {(parsingTable.HasConflicts ? "YES" : "NONE")}");
-                sb.AppendLine($"  Grammar Type: {(parsingTable.HasConflicts ? "NOT Canonical LR(1)" : "Canonical LR(1)")}");
-                sb.AppendLine("═══════════════════════════════════════════════════════════════════");
-                summaryText = sb.ToString();
+                if (!isRunning) return;
                 
-                isRunning = false;
-                isDemoComplete = true;
-                timer?.Dispose();
-            }
-            
-            StateHasChanged();
-        });
+                if (currentStep == 1)
+                {
+                    currentStep = 2;
+                    var sb = new StringBuilder();
+                    var firstSets = firstComputer.GetAllFirstSets();
+                    foreach (var nt in grammar.NonTerminals.OrderBy(x => x))
+                    {
+                        sb.AppendLine($"FIRST({nt}) = {{ {string.Join(", ", firstSets[nt].OrderBy(x => x))} }}");
+                    }
+                    firstSetsText = sb.ToString();
+                }
+                else if (currentStep == 2)
+                {
+                    currentStep = 3;
+                    collection.Build();
+                    currentStateIndex = 0;
+                }
+                else if (currentStep == 3 && currentStateIndex < collection.States.Count - 1)
+                {
+                    currentStateIndex++;
+                }
+                else if (currentStep == 3)
+                {
+                    currentStep = 4;
+                    parsingTable = new ParsingTable(grammar, collection);
+                    parsingTable.ConstructTables();
+                    currentTableStateIndex = 0;
+                }
+                else if (currentStep == 4 && currentTableStateIndex < collection.States.Count - 1)
+                {
+                    currentTableStateIndex++;
+                }
+                else if (currentStep == 4)
+                {
+                    currentStep = 5;
+                    var tokens = LR1Parser.Tokenize(inputString);
+                    var parser = new LR1Parser(grammar, parsingTable);
+                    parseSteps = parser.ParseWithSteps(tokens);
+                    currentParseStepIndex = 0;
+                }
+                else if (currentStep == 5 && currentParseStepIndex < parseSteps.Count - 1)
+                {
+                    currentParseStepIndex++;
+                }
+                else if (currentStep == 5)
+                {
+                    currentStep = 6;
+                    var sb = new StringBuilder();
+                    sb.AppendLine("═══════════════════════════════════════════════════════════════════");
+                    sb.AppendLine("GRAMMAR SEMANTICS");
+                    sb.AppendLine("═══════════════════════════════════════════════════════════════════");
+                    sb.AppendLine("The grammar treats * as a unary prefix operator (dereference),");
+                    sb.AppendLine("NOT as an infix multiplication operator.");
+                    sb.AppendLine();
+                    sb.AppendLine("Therefore, the string 'id = id * id' is NOT derivable from this");
+                    sb.AppendLine("grammar and is correctly REJECTED by the Canonical LR(1) parser.");
+                    sb.AppendLine();
+                    sb.AppendLine("Valid examples:");
+                    sb.AppendLine("  - id = * id    (assign dereference-of-id to id)");
+                    sb.AppendLine("  - * * id       (double dereference)");
+                    sb.AppendLine("  - id           (just an identifier)");
+                    sb.AppendLine();
+                    sb.AppendLine("Invalid examples:");
+                    sb.AppendLine("  - id = id * id (would require infix * operator)");
+                    sb.AppendLine();
+                    sb.AppendLine("═══════════════════════════════════════════════════════════════════");
+                    sb.AppendLine($"Final Statistics:");
+                    sb.AppendLine($"  Total LR(1) States: {collection.States.Count}");
+                    sb.AppendLine($"  Total Transitions: {collection.Transitions.Count}");
+                    sb.AppendLine($"  Conflicts: {(parsingTable.HasConflicts ? "YES" : "NONE")}");
+                    sb.AppendLine($"  Grammar Type: {(parsingTable.HasConflicts ? "NOT Canonical LR(1)" : "Canonical LR(1)")}");
+                    sb.AppendLine("═══════════════════════════════════════════════════════════════════");
+                    summaryText = sb.ToString();
+                    
+                    isRunning = false;
+                    isDemoComplete = true;
+                    timer?.Dispose();
+                }
+                
+                StateHasChanged();
+            });
+        }
     }
     
     private void Pause()
@@ -716,5 +771,148 @@
     public void Dispose()
     {
         timer?.Dispose();
+    }
+    
+    private void ParseCustomInput()
+    {
+        if (string.IsNullOrWhiteSpace(customInput))
+        {
+            customParseOutput = "ERROR: Input cannot be empty!";
+            return;
+        }
+        
+        try
+        {
+            // Initialize for custom demo mode
+            isCustomDemoMode = true;
+            currentStep = 1;
+            isRunning = true;
+            isDemoComplete = false;
+            currentStateIndex = -1;
+            currentTableStateIndex = -1;
+            currentParseStepIndex = -1;
+            customParseOutput = "";
+            customDemoGrammarText = "";
+            customDemoFirstSetsText = "";
+            customDemoSummaryText = "";
+            customDemoParseSteps.Clear();
+            
+            // Initialize parser
+            grammar = new Grammar();
+            firstComputer = new FirstSetComputer(grammar);
+            operations = new LR1Operations(grammar, firstComputer);
+            collection = new CanonicalCollection(grammar, operations);
+            
+            // Build grammar text
+            var sb = new StringBuilder();
+            for (int i = 0; i < grammar.Productions.Count; i++)
+            {
+                sb.AppendLine($"{i}: {grammar.Productions[i]}");
+            }
+            customDemoGrammarText = sb.ToString();
+            
+            StartTimer();
+        }
+        catch (Exception ex)
+        {
+            customParseOutput = $"ERROR: {ex.Message}";
+            isCustomDemoMode = false;
+        }
+    }
+    
+    private async Task AdvanceCustomStep()
+    {
+        await InvokeAsync(() =>
+        {
+            if (!isRunning) return;
+            
+            if (currentStep == 1)
+            {
+                currentStep = 2;
+            }
+            else if (currentStep == 2)
+            {
+                currentStep = 3;
+                var sb = new StringBuilder();
+                var firstSets = firstComputer.GetAllFirstSets();
+                foreach (var nt in grammar.NonTerminals.OrderBy(x => x))
+                {
+                    sb.AppendLine($"FIRST({nt}) = {{ {string.Join(", ", firstSets[nt].OrderBy(x => x))} }}");
+                }
+                customDemoFirstSetsText = sb.ToString();
+            }
+            else if (currentStep == 3 && currentStateIndex < collection.States.Count - 1)
+            {
+                currentStateIndex++;
+            }
+            else if (currentStep == 3)
+            {
+                currentStep = 4;
+                collection.Build();
+                parsingTable = new ParsingTable(grammar, collection);
+                parsingTable.ConstructTables();
+                currentTableStateIndex = 0;
+            }
+            else if (currentStep == 4 && currentTableStateIndex < collection.States.Count - 1)
+            {
+                currentTableStateIndex++;
+            }
+            else if (currentStep == 4)
+            {
+                currentStep = 5;
+                var tokens = LR1Parser.Tokenize(customInput);
+                var parser = new LR1Parser(grammar, parsingTable);
+                customDemoParseSteps = parser.ParseWithSteps(tokens);
+                currentParseStepIndex = 0;
+            }
+            else if (currentStep == 5 && currentParseStepIndex < customDemoParseSteps.Count - 1)
+            {
+                currentParseStepIndex++;
+            }
+            else if (currentStep == 5)
+            {
+                currentStep = 6;
+                var sb = new StringBuilder();
+                sb.AppendLine("═══════════════════════════════════════════════════════════════════");
+                sb.AppendLine($"CUSTOM INPUT: {customInput}");
+                sb.AppendLine("═══════════════════════════════════════════════════════════════════");
+                sb.AppendLine();
+                sb.AppendLine("PARSING RESULT:");
+                sb.AppendLine("───────────────────────────────────────────────────────────────────");
+                
+                if (customDemoParseSteps.Count > 0 && customDemoParseSteps.Last().Action.Type == ActionType.Accept)
+                {
+                    sb.AppendLine("✓ PARSING SUCCESSFUL - INPUT ACCEPTED!");
+                }
+                else
+                {
+                    sb.AppendLine("✗ PARSING FAILED - INPUT REJECTED!");
+                }
+                
+                sb.AppendLine();
+                sb.AppendLine("EXPLANATION:");
+                sb.AppendLine("───────────────────────────────────────────────────────────────────");
+                sb.AppendLine("The parsing table has NO CONFLICTS, meaning this is a valid");
+                sb.AppendLine("Canonical LR(1) grammar.");
+                sb.AppendLine();
+                sb.AppendLine("However, NO CONFLICTS ≠ ACCEPTS ALL STRINGS");
+                sb.AppendLine();
+                sb.AppendLine("The grammar defines a LANGUAGE - a specific set of valid strings.");
+                sb.AppendLine("The conflict-free parsing table just ensures that the parser can");
+                sb.AppendLine("make unambiguous decisions when processing input.");
+                sb.AppendLine();
+                sb.AppendLine("If parsing fails, it means the input string is NOT in the language");
+                sb.AppendLine("defined by this grammar, even though the parser itself is valid.");
+                sb.AppendLine();
+                sb.AppendLine("═══════════════════════════════════════════════════════════════════");
+                customDemoSummaryText = sb.ToString();
+                
+                isRunning = false;
+                isDemoComplete = true;
+                timer?.Dispose();
+            }
+            
+            StateHasChanged();
+        });
     }
 }
