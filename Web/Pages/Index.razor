@@ -374,69 +374,26 @@
     @if (currentStep >= 3)
     {
         <div class="step-container @(currentStep > 3 ? "completed-step" : "current-step")">
-            <div class="step-title">Step 3: Building LR(1) DFA - State Construction (@(currentStateIndex + 1) / @collection.States.Count)</div>
-            
-            @if (dfaSteps.Any())
-            {
-                <div style="margin-bottom: 20px; padding: 15px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
-                    <div style="font-weight: 600; color: #2c3e50; margin-bottom: 10px;">🔄 DFA Construction Process</div>
-                    <div style="font-family: 'Fira Code', monospace; font-size: 0.9em; color: #495057;">
-                        Queue: [@string.Join(", ", dfaSteps[Math.Min(currentStateIndex, dfaSteps.Count - 1)].QueueSnapshot)]<br/>
-                        States Created: @(currentStateIndex + 1) / @collection.States.Count<br/>
-                        @if (currentStateIndex >= 0 && currentStateIndex < dfaSteps.Count)
-                        {
-                            var currentDfaStep = dfaSteps[currentStateIndex];
-                            <span style="color: #e67e22; font-weight: 600;">Current: Processing State @currentDfaStep.StateId</span>
-                            @if (currentDfaStep.ShiftableSymbols.Any())
-                            {
-                                <br/>
-                                <span>Shiftable Symbols: {@string.Join(", ", currentDfaStep.ShiftableSymbols)}</span>
-                            }
-                        }
-                    </div>
-                </div>
-            }
-            
+            <div class="step-title">Step 3: Building LR(1) States (@(currentStateIndex + 1) / @collection.States.Count)</div>
             @for (int i = 0; i <= Math.Min(currentStateIndex, collection.States.Count - 1); i++)
             {
                 var state = collection.States[i];
-                var dfaStep = i < dfaSteps.Count ? dfaSteps[i] : null;
-                var isCurrentState = i == currentStateIndex;
-                
-                <div class="state-box" style="@(isCurrentState ? "border: 2px solid #e67e22; box-shadow: 0 4px 12px rgba(230, 126, 34, 0.3);" : "")">
-                    <div class="state-header" style="@(isCurrentState ? "color: #e67e22; border-bottom-color: #e67e22;" : "")">
-                        State @i (@state.Items.Count items) @(isCurrentState ? "← CURRENT" : "")
-                    </div>
-                    
-                    @if (dfaStep != null && dfaStep.IsNewState)
+                <div class="state-box">
+                    <div class="state-header">State @i (@state.Items.Count items)</div>
+                    @foreach (var item in state.Items.OrderBy(x => x.Production.LeftHandSide).ThenBy(x => x.DotPosition))
                     {
-                        <div style="background: #d4edda; color: #155724; padding: 6px 10px; margin: 8px 0; border-radius: 3px; font-size: 0.85em;">
-                            ✨ New state created via GOTO(State @dfaStep.ParentState, @dfaStep.TransitionSymbol)
-                        </div>
+                        <div class="item">[@item.Production.LeftHandSide → @GetItemDisplay(item), @item.Lookahead]</div>
                     }
-                    
-                    <div style="margin-top: 8px;">
-                        @foreach (var item in state.Items.OrderBy(x => x.Production.LeftHandSide).ThenBy(x => x.DotPosition))
-                        {
-                            <div class="item">[@item.Production.LeftHandSide → @GetItemDisplay(item), @item.Lookahead]</div>
-                        }
-                    </div>
-                    
                     @{
                         var outgoingTransitions = collection.Transitions.Where(t => t.Key.Item1 == i).ToList();
                         if (outgoingTransitions.Any())
                         {
-                            <div style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 3px;">
-                                <div style="font-weight: 600; color: #495057; margin-bottom: 6px;">📤 Transitions from this state:</div>
-                                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                    @foreach (var trans in outgoingTransitions)
-                                    {
-                                        var isTerminal = grammar.Terminals.Contains(trans.Key.Item2);
-                                        <div style="@(isTerminal ? "background: #cce5ff; color: #004085;" : "background: #f8d7da; color: #721c24;") padding: 6px 12px; border-radius: 3px; font-family: 'Fira Code', monospace; font-size: 0.85em; font-weight: 500;">
-                                            @trans.Key.Item2 → S@trans.Value
-                                        </div>
-                                    }
-                                </div>
+                            <div style="margin-top: 10px; color: #6c757d; font-size: 0.9em;">
+                                <strong>Transitions:</strong>
+                                @foreach (var trans in outgoingTransitions)
+                                {
+                                    <span style="margin-left: 10px;">@trans.Key.Item2 → State @trans.Value</span>
+                                }
                             </div>
                         }
                     }
@@ -445,27 +402,6 @@
         </div>
     }
 
-    @if (currentStep >= 3 && currentStateIndex >= collection.States.Count - 1)
-    {
-        <div class="step-container" style="border-left-color: #9b59b6;">
-            <div class="step-title" style="color: #9b59b6;">Step 3.5: Complete DFA Diagram</div>
-            <div style="background: white; padding: 20px; border: 2px solid #dee2e6; border-radius: 8px;">
-                <div style="margin-bottom: 15px; font-weight: 600; color: #2c3e50;">📊 DFA State Transition Diagram</div>
-                <svg width="100%" height="@(GetDFADiagramHeight())" viewBox="0 0 1200 @(GetDFADiagramHeight())" style="border: 1px solid #e9ecef; border-radius: 4px; background: #fafbfc;">
-                    @RenderDFADiagram()
-                </svg>
-                <div style="margin-top: 15px; padding: 12px; background: #f8f9fa; border-radius: 4px; font-size: 0.9em;">
-                    <div style="font-weight: 600; margin-bottom: 8px;">Legend:</div>
-                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                        <div><span style="display: inline-block; width: 12px; height: 12px; background: #3498db; border-radius: 50%; margin-right: 6px;"></span>States</div>
-                        <div><span style="display: inline-block; width: 20px; height: 2px; background: #2ecc71; margin-right: 6px; position: relative; top: 5px;"></span>Terminal transitions</div>
-                        <div><span style="display: inline-block; width: 20px; height: 2px; background: #e74c3c; margin-right: 6px; position: relative; top: 5px;"></span>Non-terminal transitions</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
-    
     @if (currentStep >= 4)
     {
         <div class="step-container @(currentStep > 4 ? "completed-step" : "current-step")">
@@ -615,9 +551,6 @@
     private string customInput = "id = * id";
     private string customParseOutput = "";
     
-    // DFA construction tracking
-    private List<DFAConstructionStep> dfaSteps = new();
-    
     private bool isCustomDemoMode = false;
     private string customDemoGrammarText = "";
     private string customDemoFirstSetsText = "";
@@ -684,7 +617,7 @@
                 else if (currentStep == 2)
                 {
                     currentStep = 3;
-                    BuildDFAWithSteps();
+                    collection.Build();
                     currentStateIndex = 0;
                 }
                 else if (currentStep == 3 && currentStateIndex < collection.States.Count - 1)
@@ -840,248 +773,6 @@
         timer?.Dispose();
     }
     
-    private void BuildDFAWithSteps()
-    {
-        dfaSteps.Clear();
-        collection = new CanonicalCollection(grammar, operations);
-        collection.States.Clear();
-        collection.Transitions.Clear();
-        
-        // Create initial state
-        var initialItem = new LR1Item(grammar.Productions[0], 0, "$");
-        var initialItems = new HashSet<LR1Item> { initialItem };
-        var initialState = new LR1State(operations.Closure(initialItems));
-        initialState.StateId = 0;
-        
-        collection.States.Add(initialState);
-        
-        var stateQueue = new Queue<int>();
-        stateQueue.Enqueue(0);
-        
-        var stateMap = new Dictionary<string, int>();
-        stateMap[GetStateKey(initialState)] = 0;
-        
-        dfaSteps.Add(new DFAConstructionStep
-        {
-            StateId = 0,
-            IsNewState = true,
-            ParentState = -1,
-            TransitionSymbol = "",
-            QueueSnapshot = new List<int>(stateQueue),
-            ShiftableSymbols = new List<string>()
-        });
-        
-        while (stateQueue.Count > 0)
-        {
-            var currentStateId = stateQueue.Dequeue();
-            var currentState = collection.States[currentStateId];
-            
-            var symbols = operations.GetShiftableSymbols(currentState.Items);
-            
-            dfaSteps[currentStateId].ShiftableSymbols = new List<string>(symbols);
-            
-            foreach (var symbol in symbols)
-            {
-                var gotoItems = operations.Goto(currentState.Items, symbol);
-                
-                if (gotoItems.Count == 0)
-                    continue;
-                
-                var gotoState = new LR1State(gotoItems);
-                string stateKey = GetStateKey(gotoState);
-                
-                int targetStateId;
-                
-                if (stateMap.ContainsKey(stateKey))
-                {
-                    targetStateId = stateMap[stateKey];
-                }
-                else
-                {
-                    targetStateId = collection.States.Count;
-                    gotoState.StateId = targetStateId;
-                    collection.States.Add(gotoState);
-                    stateMap[stateKey] = targetStateId;
-                    stateQueue.Enqueue(targetStateId);
-                    
-                    dfaSteps.Add(new DFAConstructionStep
-                    {
-                        StateId = targetStateId,
-                        IsNewState = true,
-                        ParentState = currentStateId,
-                        TransitionSymbol = symbol,
-                        QueueSnapshot = new List<int>(stateQueue),
-                        ShiftableSymbols = new List<string>()
-                    });
-                }
-                
-                collection.Transitions[(currentStateId, symbol)] = targetStateId;
-            }
-        }
-    }
-    
-    private string GetStateKey(LR1State state)
-    {
-        var sortedItems = state.Items.OrderBy(i => i.ToString()).ToList();
-        return string.Join("|", sortedItems.Select(i => i.ToString()));
-    }
-    
-    private int GetDFADiagramHeight()
-    {
-        int stateCount = collection.States.Count;
-        int rows = (int)Math.Ceiling(stateCount / 4.0);
-        return Math.Max(400, rows * 150 + 100);
-    }
-    
-    private RenderFragment RenderDFADiagram() => builder =>
-    {
-        if (collection?.States == null || !collection.States.Any())
-            return;
-        
-        int statesPerRow = 4;
-        int stateRadius = 30;
-        int horizontalSpacing = 280;
-        int verticalSpacing = 150;
-        int startX = 150;
-        int startY = 80;
-        
-        var statePositions = new Dictionary<int, (int x, int y)>();
-        
-        // Calculate positions
-        for (int i = 0; i < collection.States.Count; i++)
-        {
-            int row = i / statesPerRow;
-            int col = i % statesPerRow;
-            int x = startX + col * horizontalSpacing;
-            int y = startY + row * verticalSpacing;
-            statePositions[i] = (x, y);
-        }
-        
-        // Draw transitions
-        foreach (var transition in collection.Transitions)
-        {
-            var (fromState, symbol) = transition.Key;
-            var toState = transition.Value;
-            
-            if (!statePositions.ContainsKey(fromState) || !statePositions.ContainsKey(toState))
-                continue;
-            
-            var (x1, y1) = statePositions[fromState];
-            var (x2, y2) = statePositions[toState];
-            
-            bool isTerminal = grammar.Terminals.Contains(symbol);
-            string color = isTerminal ? "#2ecc71" : "#e74c3c";
-            
-            // Self-loop
-            if (fromState == toState)
-            {
-                builder.OpenElement(0, "path");
-                builder.AddAttribute(1, "d", $"M {x1},{y1 - stateRadius} Q {x1 + 50},{y1 - 70} {x1},{y1 - stateRadius}");
-                builder.AddAttribute(2, "stroke", color);
-                builder.AddAttribute(3, "stroke-width", "2");
-                builder.AddAttribute(4, "fill", "none");
-                builder.AddAttribute(5, "marker-end", "url(#arrowhead)");
-                builder.CloseElement();
-                
-                builder.OpenElement(6, "text");
-                builder.AddAttribute(7, "x", x1 + 25);
-                builder.AddAttribute(8, "y", y1 - 60);
-                builder.AddAttribute(9, "font-size", "12");
-                builder.AddAttribute(10, "fill", color);
-                builder.AddAttribute(11, "font-weight", "600");
-                builder.AddContent(12, symbol);
-                builder.CloseElement();
-            }
-            else
-            {
-                // Calculate arrow endpoint
-                double angle = Math.Atan2(y2 - y1, x2 - x1);
-                int endX = (int)(x2 - stateRadius * Math.Cos(angle));
-                int endY = (int)(y2 - stateRadius * Math.Sin(angle));
-                int startXAdjusted = (int)(x1 + stateRadius * Math.Cos(angle));
-                int startYAdjusted = (int)(y1 + stateRadius * Math.Sin(angle));
-                
-                // Draw line
-                builder.OpenElement(13, "line");
-                builder.AddAttribute(14, "x1", startXAdjusted);
-                builder.AddAttribute(15, "y1", startYAdjusted);
-                builder.AddAttribute(16, "x2", endX);
-                builder.AddAttribute(17, "y2", endY);
-                builder.AddAttribute(18, "stroke", color);
-                builder.AddAttribute(19, "stroke-width", "2");
-                builder.AddAttribute(20, "marker-end", "url(#arrowhead)");
-                builder.CloseElement();
-                
-                // Draw label
-                int midX = (startXAdjusted + endX) / 2;
-                int midY = (startYAdjusted + endY) / 2;
-                
-                builder.OpenElement(21, "text");
-                builder.AddAttribute(22, "x", midX);
-                builder.AddAttribute(23, "y", midY - 5);
-                builder.AddAttribute(24, "font-size", "12");
-                builder.AddAttribute(25, "fill", color);
-                builder.AddAttribute(26, "font-weight", "600");
-                builder.AddAttribute(27, "text-anchor", "middle");
-                builder.AddContent(28, symbol);
-                builder.CloseElement();
-            }
-        }
-        
-        // Draw states
-        for (int i = 0; i < collection.States.Count; i++)
-        {
-            var (x, y) = statePositions[i];
-            
-            // Circle
-            builder.OpenElement(29, "circle");
-            builder.AddAttribute(30, "cx", x);
-            builder.AddAttribute(31, "cy", y);
-            builder.AddAttribute(32, "r", stateRadius);
-            builder.AddAttribute(33, "fill", "#3498db");
-            builder.AddAttribute(34, "stroke", "#2980b9");
-            builder.AddAttribute(35, "stroke-width", "2");
-            builder.CloseElement();
-            
-            // State number
-            builder.OpenElement(36, "text");
-            builder.AddAttribute(37, "x", x);
-            builder.AddAttribute(38, "y", y + 5);
-            builder.AddAttribute(39, "font-size", "16");
-            builder.AddAttribute(40, "font-weight", "bold");
-            builder.AddAttribute(41, "fill", "white");
-            builder.AddAttribute(42, "text-anchor", "middle");
-            builder.AddContent(43, i.ToString());
-            builder.CloseElement();
-        }
-        
-        // Arrow marker definition
-        builder.OpenElement(44, "defs");
-        builder.OpenElement(45, "marker");
-        builder.AddAttribute(46, "id", "arrowhead");
-        builder.AddAttribute(47, "markerWidth", "10");
-        builder.AddAttribute(48, "markerHeight", "10");
-        builder.AddAttribute(49, "refX", "9");
-        builder.AddAttribute(50, "refY", "3");
-        builder.AddAttribute(51, "orient", "auto");
-        builder.OpenElement(52, "polygon");
-        builder.AddAttribute(53, "points", "0 0, 10 3, 0 6");
-        builder.AddAttribute(54, "fill", "#333");
-        builder.CloseElement();
-        builder.CloseElement();
-        builder.CloseElement();
-    };
-    
-    public class DFAConstructionStep
-    {
-        public int StateId { get; set; }
-        public bool IsNewState { get; set; }
-        public int ParentState { get; set; }
-        public string TransitionSymbol { get; set; } = "";
-        public List<int> QueueSnapshot { get; set; } = new();
-        public List<string> ShiftableSymbols { get; set; } = new();
-    }
-    
     private void ParseCustomInput()
     {
         if (string.IsNullOrWhiteSpace(customInput))
@@ -1111,7 +802,6 @@
             firstComputer = new FirstSetComputer(grammar);
             operations = new LR1Operations(grammar, firstComputer);
             collection = new CanonicalCollection(grammar, operations);
-            dfaSteps.Clear();
             
             // Build grammar text
             var sb = new StringBuilder();
@@ -1150,8 +840,6 @@
                     sb.AppendLine($"FIRST({nt}) = {{ {string.Join(", ", firstSets[nt].OrderBy(x => x))} }}");
                 }
                 customDemoFirstSetsText = sb.ToString();
-                BuildDFAWithSteps();
-                currentStateIndex = 0;
             }
             else if (currentStep == 3 && currentStateIndex < collection.States.Count - 1)
             {
@@ -1160,6 +848,7 @@
             else if (currentStep == 3)
             {
                 currentStep = 4;
+                collection.Build();
                 parsingTable = new ParsingTable(grammar, collection);
                 parsingTable.ConstructTables();
                 currentTableStateIndex = 0;
